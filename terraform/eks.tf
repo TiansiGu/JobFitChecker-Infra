@@ -16,8 +16,8 @@ module "eks" {
     enable_irsa = true
 
     # Network positions
-    vpc_id     = var.vpc-id
-    subnet_ids = var.public-subnet-ids
+    vpc_id     = var.vpc_id
+    subnet_ids = var.public_subnet_ids
 
     eks_managed_node_group_defaults = {
         ami_type = "AL2_x86_64" # Amazon Linux2, amd

@@ -8,7 +8,7 @@ variable "aws_region" {
   default     = "us-west-2"
 }
 
-variable "vpc-id" {
+variable "vpc_id" {
     type    = string
     default = "vpc-01c73a4c2de6c0fbb"
 }
@@ -22,7 +22,7 @@ variable "private_subnet_ids" {
   ]
 }
 
-variable "public-subnet-ids" {
+variable "public_subnet_ids" {
   default = [
     "subnet-035a0c26808ba5691",
     "subnet-0ce670b04e8215f6a",
