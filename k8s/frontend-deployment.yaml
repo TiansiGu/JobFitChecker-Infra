@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend-deployment
+  namespace: uat # in which namespace does the resource lives
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: frontend
+  template:   # pod template used for creating new pods
+    metadata:
+      labels: # labels to apply to the pods created from this template
+        app: frontend
+    spec:
+      containers: # usually 1 container per pod
+        - name: jfc-frontend-container
+          image: todo
+          ports:
+            - containerPort: 3000  # which port the container listens on internally.
+
+
+

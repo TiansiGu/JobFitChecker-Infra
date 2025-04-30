@@ -1,0 +1,65 @@
+name: Build and Push All
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write   # Needed for OIDC
+  contents: read    # Needed to clone repos and read GitHub contents
+
+jobs:
+  build-push-all-service:
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: us-west-2
+      SOURCE_REPO: https://github.com/TiansiGu/JobFitCheker-Source
+
+    steps:
+      - name: Checkout Source Repo
+        uses: actions/checkout@v4
+        with:
+          repository: "TiansiGu/JobFitCheker-Source"
+          path: "app"  # Directory where the repo will be cloned
+
+      - name: Build Docker images
+        run: |
+          cd app
+          
+          echo "Building frontend service..."
+          docker build -t jobfitchecker-frontend-service ./Jobfit-Checker-Frontend/
+          echo "Frontend image built ✅"
+          
+          echo "Building user service..."
+          docker build -t jobfitchecker-user-service ./JobFitCheckerApp/
+          echo "Backend user service built ✅"
+          
+          echo "Building user service..."
+          docker build -t jobfitchecker-ppw ./JobFitCheckerApp/
+          echo "Backend resume post-processing workflow built ✅"
+  
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        run: |
+          aws ecr get-login-password --region $AWS_REGION \
+          | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.$AWS_REGION.amazonaws.com
+
+      - name: Push image to ECR
+        run: |
+          docker ps 
+
+  #    - name: Pull image from ECR
+  #
+  #    - name: Upload .env file to QA EC2
+  #      run: |
+  #        echo "${{ secrets.QA_DOTENV }}" | ssh -o StrictHostKeyChecking=no ec2-user@${{ secrets.QA_EC2_HOST }} "cat > ~/app/.env"
+  #
+
+        
+        
+        
