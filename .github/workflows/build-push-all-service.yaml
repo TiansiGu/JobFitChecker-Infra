@@ -26,15 +26,15 @@ jobs:
           cd app
           
           echo "Building frontend service..."
-          docker build -t jobfitchecker-frontend-service ./Jobfit-Checker-Frontend/
+          docker build -t frontend ./Jobfit-Checker-Frontend/
           echo "Frontend image built ✅"
           
           echo "Building user service..."
-          docker build -t jobfitchecker-user-service ./JobFitCheckerApp/
+          docker build -t app ./JobFitCheckerApp/
           echo "Backend user service built ✅"
           
           echo "Building user service..."
-          docker build -t jobfitchecker-ppw ./JobFitCheckerApp/
+          docker build -t postprocessor ./ResumePostProcessor/
           echo "Backend resume post-processing workflow built ✅"
   
 
@@ -51,7 +51,14 @@ jobs:
 
       - name: Push image to ECR
         run: |
-          docker ps 
+          cd app
+          IMAGE_TAG=v1.0.0-qa
+          for svc in frontend app postprocessor; do
+            FULL_IMAGE="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPO_NAMESPACE }}/$svc:$IMAGE_TAG"
+            echo "📦 Tagging $svc → $FULL_IMAGE"
+            docker tag "$svc" "$FULL_IMAGE"
+            docker push "$FULL_IMAGE"
+          done
 
   #    - name: Pull image from ECR
   #
