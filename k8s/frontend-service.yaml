@@ -7,6 +7,6 @@ spec:
   selector:
     app: frontend # match Pod label
   ports:
-    - port: 3000  # the port number that the Service exposes inside the cluster
+    - port: 80  # the port number that the Service exposes inside the cluster
       targetPort: 3000  # the port on the container (inside the Pod) that the Service forwards traffic to.
   type: ClusterIP

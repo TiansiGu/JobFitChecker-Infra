@@ -1,0 +1,32 @@
+apiVersion: networking.k8s.io/v1   # Specifies the API version for the Ingress resource
+kind: Ingress
+metadata:
+  name: ingress
+  namespace: ${STAGE}
+  annotations:
+    nginx.ingress.kubernetes.io/use-regex: "true"  # Use regex matching in paths
+    kubernetes.io/ingress.class: nginx             # Select the NGINX Ingress controller
+
+spec:
+  ingressClassName: nginx          # Use nginx as IngressController
+  rules:                           # Defines the routing rules for HTTP traffic
+    - host: uat.tiansiwork.live        # !!To be changed to dynamic STAGE mapping
+      http:
+        paths:
+          # FRONTEND: path start from "/"
+          - path: /                    # Match all requests starting with "/"
+            pathType: Prefix           # Use prefix matching for path ("/" matches everything)
+            backend:                   # Defines where to send matching traffic
+              service:
+                name: frontend-service # Name of the Service (ClusterIP) to route traffic to
+                port:
+                  number: 80         # The port exposed by the Service
+
+          # APP: path start from "/api"
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: userservice-service
+                port:
+                  number: 8080

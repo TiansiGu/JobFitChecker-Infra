@@ -18,6 +18,11 @@ spec:
           image: 891612549148.dkr.ecr.us-west-2.amazonaws.com/job-fit-checker/frontend:${FRONTEND_TAG}
           ports:
             - containerPort: 3000  # which port the container listens on internally.
+          env:
+            - name: HOST
+              value: "0.0.0.0"
+            - name: DANGEROUSLY_DISABLE_HOST_CHECK
+              value: "true"
 
 
 
