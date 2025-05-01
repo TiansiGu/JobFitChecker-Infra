@@ -30,3 +30,8 @@ variable "public_subnet_ids" {
     # "subnet-02f077e30f62225be"
   ]
 }
+
+variable "service_account_name" {
+  type = string
+  default = "jfc-sa"
+}
