@@ -62,54 +62,72 @@ jobs:
           echo "🖼️  FRONTEND_IMAGE     = $FRONTEND_IMAGE"
           echo "🖼️  APP_IMAGE          = $APP_IMAGE"
           echo "🖼️  POSTPROCESSOR_IMAGE = $POSTPROCESSOR_IMAGE"
-          
 
-#      - name: Launch QA EC2 and associated sg
-#        run: |
-#          cd infra/terraform/qa
-#          terraform init
-#          terraform apply -auto-approve
-#          PUBLIC_IP=$(terraform output -raw qa_ec2_public_ip)
-#          echo "PUBLIC_IP=$PUBLIC_IP" >> $GITHUB_ENV
-#
-#      - name: Set up SSH Key
-#        run: |
-#          echo "${{ secrets.QA_EC2_SSH_KEY }}" > private-subnet.pem
-#          chmod 400 private-subnet.pem
-#
-#      - name: Set up .env for QA
-#        run: |
-#          echo "${{ secrets.QA_DOTENV }}" > .env
-#          chmod 400 .env
-#
-#      - name: Deploy services to QA EC2
-#        run: |
-#          REGION=${{ env.AWS_REGION }}
-#          ACCOUNT_ID=${{ secrets.AWS_ACCOUNT_ID }}
-#
-#          scp -i private-subnet.pem \
-#            -o StrictHostKeyChecking=no \
-#            source/docker-compose-qa.yml \
-#            ec2-user@${{ env.PUBLIC_IP }}:/home/ec2-user/docker-compose.yml
-#
-#          scp -i private-subnet.pem \
-#            -o StrictHostKeyChecking=no \
-#            .env \
-#            ec2-user@${{ env.PUBLIC_IP }}:/home/ec2-user/
-#
-#          ssh -i private-subnet.pem \
-#            -o StrictHostKeyChecking=no \
-#            ec2-user@${{ env.PUBLIC_IP }} << 'EOF'
-#
-#              export AWS_REGION=${{ env.AWS_REGION }}
-#              aws ecr get-login-password --region $REGION | docker login \
-#                --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com
-#
-#              cd /home/ec2-user
-#              docker compose up -d
-#          EOF
-#
-#
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.11.3
+
+      - name: Launch QA EC2 and associated sg
+        run: |
+          cd infra/terraform/qa
+          terraform init
+          terraform apply -auto-approve
+          PUBLIC_IP=$(terraform output -raw qa_ec2_public_ip)
+          echo "PUBLIC_IP=$PUBLIC_IP" >> $GITHUB_ENV
+
+      - name: Set up SSH Key
+        run: |
+          echo "${{ secrets.QA_EC2_SSH_KEY }}" > private-subnet.pem
+          chmod 400 private-subnet.pem
+
+      - name: Set up .env for QA
+        run: |
+          echo "${{ secrets.QA_DOTENV }}" > merged.env
+
+      - name: Merge app secrets and image URIs into one .env file
+        run: |
+          echo "FRONTEND_IMAGE=$FRONTEND_IMAGE" >> merged.env
+          echo "APP_IMAGE=$APP_IMAGE" >> merged.env
+          echo "POSTPROCESSOR_IMAGE=$POSTPROCESSOR_IMAGE" >> merged.env
+
+      - name: Deploy services to QA EC2
+        run: |
+          REGION=${{ env.AWS_REGION }}
+          ACCOUNT_ID=${{ secrets.AWS_ACCOUNT_ID }}
+          ACCESS_KEY=${{ env.AWS_ACCESS_KEY_ID }}
+          SECRET_KEY=${{ env.AWS_SECRET_ACCESS_KEY }}
+          SESSION_TOKEN=${{ env.AWS_SESSION_TOKEN }}
+
+          scp -i private-subnet.pem \
+            -o StrictHostKeyChecking=no \
+            source/docker-compose-qa.yml \
+            ec2-user@${{ env.PUBLIC_IP }}:/home/ec2-user/docker-compose.yml
+
+          scp -i private-subnet.pem \
+            -o StrictHostKeyChecking=no \
+            merged.env \
+            ec2-user@${{ env.PUBLIC_IP }}:/home/ec2-user/.env
+
+          ssh -i private-subnet.pem \
+            -o StrictHostKeyChecking=no \
+            ec2-user@${{ env.PUBLIC_IP }} << EOF
+
+              export AWS_ACCOUNT_ID=$ACCOUNT_ID
+              export AWS_REGION=$REGION
+              export AWS_ACCESS_KEY_ID=$ACCESS_KEY
+              export AWS_SECRET_ACCESS_KEY=$SECRET_KEY
+              export AWS_SESSION_TOKEN=$SESSION_TOKEN
+          
+              aws ecr get-login-password --region \$AWS_REGION | docker login \
+                --username AWS --password-stdin \$AWS_ACCOUNT_ID.dkr.ecr.\$AWS_REGION.amazonaws.com
+
+              cd /home/ec2-user
+              docker-compose up -d
+          EOF
+          
+          
 
 #      - name: Destroy EC2 and associated sg
 #        run: |
