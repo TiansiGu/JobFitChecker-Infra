@@ -59,15 +59,48 @@ jobs:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-role
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Build frontend Docker image if changed
-        if: env.FRONTEND_CHANGED == 'true'
-        run: docker build -t frontend source/Jobfit-Checker-Frontend/
+      - name: Login to ECR
+        run: |
+          aws ecr get-login-password --region $AWS_REGION \
+          | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.$AWS_REGION.amazonaws.com
 
-      - name: Build app Docker image if changed
+      - name: Get tag for current commit
+        run: |
+          SERVICE_NAME=job-fit-checker/frontend
+          
+          # Get all image tags like v0.0.1-qa
+          TAGS=$(aws ecr describe-images \
+          --repository-name $SERVICE_NAME \
+          --region $AWS_REGION \
+          --query 'imageDetails[].imageTags[]' \
+          --output text | tr '\t' '\n' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+-qa$')
+          
+          if [ -z "$TAGS" ]; then
+            # Default if no tag found
+            NEW_TAG="v1.0.0-qa"
+          else
+            # Remove the -qa suffix from each tag, use version-aware sorting, and get the highest version
+            MAX_TAG=$(echo "$TAGS" | sed 's/-qa$//' | sort -V | tail -n 1)
+            # Split major.minor.patch
+            IFS='.' read -r MAJOR MINOR PATCH <<< "${MAX_TAG#v}"
+            # Increment patch version
+            PATCH=$((PATCH + 1)) 
+            NEW_TAG="v$MAJOR.$MINOR.$PATCH-qa"
+          fi
+               
+          echo "NEW_TAG=$NEW_TAG" >> $GITHUB_ENV
+          echo "Next tag: $NEW_TAG"
+
+
+#      - name: Build and push frontend Docker image if changed
+#        if: env.FRONTEND_CHANGED == 'true'
+#        run: docker build -t frontend source/Jobfit-Checker-Frontend/
+
+      - name: Build and push app Docker image if changed
         if: env.APP_CHANGED == 'true'
         run: docker build -t app source/JobFitCheckerApp/
 
-      - name: Build ppw Docker image if changed
+      - name: Build and push ppw Docker image if changed
         if: env.PPW_CHANGED == 'true'
         run: docker build -t postprocessor source/ResumePostProcessor/
 
