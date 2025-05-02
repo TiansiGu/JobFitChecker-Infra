@@ -24,6 +24,12 @@ jobs:
           ref: dev
           fetch-depth: 0
 
+      - name: Checkout Infra Repo
+        uses: actions/checkout@v4
+        with:
+          repository: "TiansiGu/JobFitChecker-Infra"
+          path: "infra"
+
       - name: Fetch main branch for comparison
         run: |
           cd source
@@ -64,43 +70,56 @@ jobs:
           aws ecr get-login-password --region $AWS_REGION \
           | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.$AWS_REGION.amazonaws.com
 
-      - name: Get tag for current commit
-        run: |
-          SERVICE_NAME=job-fit-checker/frontend
-          
-          # Get all image tags like v0.0.1-qa
-          TAGS=$(aws ecr describe-images \
-          --repository-name $SERVICE_NAME \
-          --region $AWS_REGION \
-          --query 'imageDetails[].imageTags[]' \
-          --output text | tr '\t' '\n' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+-qa$')
-          
-          if [ -z "$TAGS" ]; then
-            # Default if no tag found
-            NEW_TAG="v1.0.0-qa"
-          else
-            # Remove the -qa suffix from each tag, use version-aware sorting, and get the highest version
-            MAX_TAG=$(echo "$TAGS" | sed 's/-qa$//' | sort -V | tail -n 1)
-            # Split major.minor.patch
-            IFS='.' read -r MAJOR MINOR PATCH <<< "${MAX_TAG#v}"
-            # Increment patch version
-            PATCH=$((PATCH + 1)) 
-            NEW_TAG="v$MAJOR.$MINOR.$PATCH-qa"
-          fi
-               
-          echo "NEW_TAG=$NEW_TAG" >> $GITHUB_ENV
-          echo "Next tag: $NEW_TAG"
+      - name: Make helper scripts executable
+        run: chmod +x infra/scripts/*.sh
 
+      - name: Build frontend Docker image if changed
+        if: env.FRONTEND_CHANGED == 'true'
+        run: docker build -t frontend source/Jobfit-Checker-Frontend/
 
-#      - name: Build and push frontend Docker image if changed
-#        if: env.FRONTEND_CHANGED == 'true'
-#        run: docker build -t frontend source/Jobfit-Checker-Frontend/
-
-      - name: Build and push app Docker image if changed
+      - name: Build app Docker image if changed
         if: env.APP_CHANGED == 'true'
         run: docker build -t app source/JobFitCheckerApp/
 
-      - name: Build and push ppw Docker image if changed
+      - name: Build ppw Docker image if changed
         if: env.PPW_CHANGED == 'true'
         run: docker build -t postprocessor source/ResumePostProcessor/
+
+      - name: Push new images to ECR
+        run: |
+          declare -A SERVICES=(
+            [frontend]=$FRONTEND_CHANGED
+            [app]=$APP_CHANGED
+            [postprocessor]=$PPW_CHANGED
+          )
+          
+          for SERVICE in "${!SERVICES[@]}"; do
+            CHANGED=${SERVICES[$SERVICE]}
+            if [ "$CHANGED" = "true" ]; then
+              echo "🔄 $SERVICE has changed, tagging and pushing..."
+              
+              # Get next ECR tag
+              NEW_TAG=$(infra/scripts/get-next-qa-tag.sh \
+              "${{ secrets.ECR_REPO_NAMESPACE }}/frontend" \
+              "${{ env.AWS_REGION }}")
+              
+              echo "NEW_TAG=$NEW_TAG" >> $GITHUB_ENV
+              echo "Tag for frontend: $NEW_TAG"
+              
+              # Tag and push to ECR
+              infra/scripts/tag-and-push-image.sh \
+              frontend \
+              "$NEW_TAG" \
+              "${{ secrets.ECR_REPO_NAMESPACE }}" \
+              "${{ secrets.AWS_ACCOUNT_ID }}" \
+              "${{ env.AWS_REGION }}"
+            else
+              echo "⏹️ $SERVICE unchanged, skipping."
+            fi     
+          done
+        env:
+          FRONTEND_CHANGED: ${{ env.FRONTEND_CHANGED }}
+          APP_CHANGED: ${{ env.APP_CHANGED }}
+          PPW_CHANGED: ${{ env.PPW_CHANGED }}
+
 
