@@ -4,7 +4,7 @@ metadata:
   name: resumeppw-deployment
   namespace: ${STAGE} # in which namespace does the resource lives
 spec:
-  replicas: 4
+  replicas: 2
   selector:
     matchLabels:
       app: resumeppw
@@ -13,11 +13,20 @@ spec:
       labels: # labels to apply to the pods created from this template
         app: resumeppw
     spec:
+      serviceAccountName: jfc-sa
       containers: # usually 1 container per pod
         - name: jfc-resumeppw-container
-          image: 891612549148.dkr.ecr.us-west-2.amazonaws.com/job-fit-checker/postprocessor${PPW_TAG}
-          ports:
-            - containerPort: 8081  # which port the container listens on internally.
+          imagePullPolicy: Always
+          image: 891612549148.dkr.ecr.us-west-2.amazonaws.com/job-fit-checker/postprocessor:${PPW_TAG}
+          env:
+            - name: MY_DB_HOST
+              value: "resumeinfo-database.ch00ay8y21vy.us-west-2.rds.amazonaws.com"
+            - name: MY_DB_USERNAME
+              value: "postgres"
+            - name: MY_DB_PASSWORD
+              value: "ResumeReader24!"
+            - name: OPEN_AI_API_KEY
+              value: "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"
 
 
 
