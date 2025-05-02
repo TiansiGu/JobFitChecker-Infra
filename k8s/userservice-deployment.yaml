@@ -4,7 +4,7 @@ metadata:
   name: userservice-deployment
   namespace: ${STAGE} # in which namespace does the resource lives
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: userservice
@@ -16,9 +16,19 @@ spec:
       serviceAccountName: jfc-sa
       containers: # usually 1 container per pod
         - name: jfc-userservice-container
-          image: ${AWS_ACCOUNT_ID}.dkr.ecr.us-west-2.amazonaws.com/job-fit-checker/app${APP_TAG}
+          imagePullPolicy: Always
+          image: ${AWS_ACCOUNT_ID}.dkr.ecr.us-west-2.amazonaws.com/job-fit-checker/app:${APP_TAG}
           ports:
             - containerPort: 8080  # which port the container listens on internally.
+          env:
+            - name: MY_DB_HOST
+              value: "resumeinfo-database.ch00ay8y21vy.us-west-2.rds.amazonaws.com"
+            - name: MY_DB_USERNAME
+              value: "postgres"
+            - name: MY_DB_PASSWORD
+              value: "ResumeReader24!"
+            - name: OPEN_AI_API_KEY
+              value: "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"
 
 
 

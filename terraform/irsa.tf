@@ -40,14 +40,18 @@ resource "aws_iam_role_policy" "uat_irsa_policy" {
       {
         Effect = "Allow"
         Action = [
-          "s3:*"
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject"
         ]
         Resource = "*"
       },
       {
         Effect = "Allow"
         Action = [
-          "sqs:*"
+          "sqs:ReceiveMessage",         // To fetch the message
+          "sqs:DeleteMessage",          // To delete it after processing (very common)
+          "sqs:GetQueueAttributes"      // To get queue metadata (used internally by SDK)
         ]
         Resource = "*"
       }
@@ -91,14 +95,18 @@ resource "aws_iam_role_policy" "ga_irsa_policy" {
       {
         Effect = "Allow"
         Action = [
-          "s3:*"
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject"
         ]
         Resource = "*"
       },
       {
         Effect = "Allow"
         Action = [
-          "sqs:*"
+          "sqs:ReceiveMessage",         // To fetch the message
+          "sqs:DeleteMessage",          // To delete it after processing (very common)
+          "sqs:GetQueueAttributes"      // To get queue metadata (used internally by SDK)
         ]
         Resource = "*"
       }

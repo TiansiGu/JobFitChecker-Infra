@@ -13,15 +13,6 @@ spec:
     - host: ${STAGE}.tiansiwork.live        # !!To be changed to dynamic STAGE mapping
       http:
         paths:
-          # FRONTEND: path start from "/"
-          - path: /                    # Match all requests starting with "/"
-            pathType: Prefix           # Use prefix matching for path ("/" matches everything)
-            backend:                   # Defines where to send matching traffic
-              service:
-                name: frontend-service # Name of the Service (ClusterIP) to route traffic to
-                port:
-                  number: 80         # The port exposed by the Service
-
           # APP: path start from "/api"
           - path: /api
             pathType: Prefix
@@ -30,3 +21,12 @@ spec:
                 name: userservice-service
                 port:
                   number: 8080
+
+          # FRONTEND: path start from "/"
+          - path: /                    # Match all requests starting with "/"
+            pathType: Prefix           # Use prefix matching for path ("/" matches everything)
+            backend:                   # Defines where to send matching traffic
+              service:
+                name: frontend-service # Name of the Service (ClusterIP) to route traffic to
+                port:
+                  number: 80         # The port exposed by the Service

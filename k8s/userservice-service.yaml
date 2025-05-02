@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: userservice-service
+  namespace: ${STAGE}
+spec:
+  selector:
+    app: userservice # match Pod label
+  ports:
+    - port: 8080  # the port number that the Service exposes inside the cluster
+      targetPort: 8080  # the port on the container (inside the Pod) that the Service forwards traffic to.
+  type: ClusterIP
