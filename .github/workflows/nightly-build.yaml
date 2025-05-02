@@ -12,6 +12,8 @@ permissions:
 jobs:
   nightly-build:
     runs-on: ubuntu-latest
+    env:
+      AWS_REGION: us-west-2
 
     steps:
       - name: Checkout Source Repo
@@ -42,13 +44,30 @@ jobs:
           fi
           
           if echo "$CHANGED_FILES" | grep -q '^ResumePostProcessor/'; then
-            echo "POSTPROCESSOR_CHANGED=true" >> $GITHUB_ENV
+            echo "PPW_CHANGED=true" >> $GITHUB_ENV
           fi
 
-      - name: Build frontend
+      - name: Log service changes   # for debugging
         run: |
-          echo "frontend change: $FRONTEND_CHANGED"
-          echo "app change: $APP_CHANGED"
-          echo "ppw change: $POSTPROCESSOR_CHANGED"
-#        if: env.FRONTEND_CHANGED == 'true'
-#        run: docker build -t my-frontend ./Jobfit-Checker-Frontend
+          echo "frontend change: ${{ env.FRONTEND_CHANGED }}"
+          echo "app change: ${{ env.APP_CHANGED }}"
+          echo "ppw change: ${{ env.APP_CHANGED }}"
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Build frontend Docker image if changed
+        if: env.FRONTEND_CHANGED == 'true'
+        run: docker build -t frontend source/Jobfit-Checker-Frontend/
+
+      - name: Build app Docker image if changed
+        if: env.APP_CHANGED == 'true'
+        run: docker build -t app source/JobFitCheckerApp/
+
+      - name: Build ppw Docker image if changed
+        if: env.PPW_CHANGED == 'true'
+        run: docker build -t postprocessor source/ResumePostProcessor/
+
