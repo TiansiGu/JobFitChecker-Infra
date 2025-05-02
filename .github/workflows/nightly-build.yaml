@@ -1,0 +1,54 @@
+name: Nightly Build
+
+on:
+  schedule:
+    - cron: "0 0 * * *"  # UTC
+  workflow_dispatch:
+
+permissions:
+  id-token: write   # Needed for OIDC
+  contents: read    # Needed to clone repos and read GitHub contents
+
+jobs:
+  nightly-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Source Repo
+        uses: actions/checkout@v4
+        with:
+          repository: "TiansiGu/JobFitCheker-Source"
+          path: "source"  # path in Ubuntu build machine
+          ref: dev
+          fetch-depth: 0
+
+      - name: Fetch main branch for comparison
+        run: |
+          cd source
+          git fetch origin main
+
+      - name: Detect changed services since last main
+        run: |
+          cd source
+          CHANGED_FILES=$(git diff --name-only origin/main...HEAD)
+
+          if echo "$CHANGED_FILES" | grep -q '^Jobfit-Checker-Frontend/'; then
+            echo "FRONTEND_CHANGED=true" >> $GITHUB_ENV
+          fi
+          # repeat for other services
+          
+          if echo "$CHANGED_FILES" | grep -q '^JobFitCheckerApp/'; then
+            echo "APP_CHANGED=true" >> $GITHUB_ENV
+          fi
+          
+          if echo "$CHANGED_FILES" | grep -q '^ResumePostProcessor/'; then
+            echo "POSTPROCESSOR_CHANGED=true" >> $GITHUB_ENV
+          fi
+
+      - name: Build frontend
+        run: |
+          echo "frontend change: $FRONTEND_CHANGED"
+          echo "app change: $APP_CHANGED"
+          echo "ppw change: $POSTPROCESSOR_CHANGED"
+#        if: env.FRONTEND_CHANGED == 'true'
+#        run: docker build -t my-frontend ./Jobfit-Checker-Frontend
