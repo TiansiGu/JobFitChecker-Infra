@@ -18,7 +18,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: userservice-service
+                name: userservice-service-${APP_VERSION}
                 port:
                   number: 8080
 
@@ -27,6 +27,6 @@ spec:
             pathType: Prefix           # Use prefix matching for path ("/" matches everything)
             backend:                   # Defines where to send matching traffic
               service:
-                name: frontend-service # Name of the Service (ClusterIP) to route traffic to
+                name: frontend-service-${FRONTEND_VERSION} # Name of the Service (ClusterIP) to route traffic to
                 port:
                   number: 80         # The port exposed by the Service

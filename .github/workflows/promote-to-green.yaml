@@ -1,4 +1,4 @@
-name: Deploy to GA (production) with blue-green
+name: Deploy to Green to GA
 
 on:
   workflow_dispatch:
@@ -38,15 +38,122 @@ jobs:
             --name ${{ secrets.CLUSTER_NAME}}
           kubectl config current-context
 
-      - name: Clean up UAT deployments
+#      - name: Clean up UAT deployments
+#        run: |
+#          kubectl delete ingress ingress -n uat
+#
+#          kubectl delete service frontend-service -n uat
+#          kubectl delete service userservice-service -n uat
+#
+#          kubectl delete deployment frontend-deployment -n uat
+#          kubectl delete deployment userservice-deployment -n uat
+#          kubectl delete deployment resumeppw-deployment -n uat
+#
+#          kubectl delete serviceaccount jfc-sa -n uat
+
+      - name: Login to ECR
         run: |
-          kubectl delete ingress ingress -n uat 
+          aws ecr get-login-password --region $AWS_REGION \
+          | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.$AWS_REGION.amazonaws.com
+
+      - name: Make helper scripts executable
+        run: chmod +x infra/scripts/*.sh
+
+      - name: Compare GA image tags, identify updated services, and re-tag to pre-ga
+        run: |
+          BLUE_GREEN_FLAG="false"
+          for svc in frontend app postprocessor; do
+            REPO_NAME="${{ secrets.ECR_REPO_NAMESPACE }}/$svc"
+
+            # Get the latest uat tags
+            LATEST_TAG_UAT=$(infra/scripts/get-latest-tag.sh \
+              "$REPO_NAME" \
+              "$AWS_REGION" \
+              "${{ secrets.AWS_ACCOUNT_ID }}" \
+              uat)
+
+            # Get the latest uat tags
+            LATEST_TAG_PRE_GA=$(infra/scripts/get-latest-tag.sh \
+              "$REPO_NAME" \
+              "$AWS_REGION" \
+              "${{ secrets.AWS_ACCOUNT_ID }}" \
+              pre-ga)
+
+            BLUE_GREEN_SVC_FLAG="false"
+            if [ "$LATEST_TAG_PRE_GA" = "none" ]; then
+              echo " 🆕 PRE_GA tag does not exist, will add."
+              NEW_TAG="${LATEST_TAG_UAT}-pre-ga"
+            elif [ "$LATEST_TAG_PRE_GA" != "$LATEST_TAG_UAT" ] && [ "$(printf "%s\n%s" "$LATEST_TAG_PRE_GA" "$LATEST_TAG_UAT" | sort -V | head -n1)" = "$LATEST_TAG_PRE_GA" ]; then
+              echo " 🆕 $LATEST_TAG_PRE_GA is less than $LATEST_TAG_UAT, $svc was updated"
+              NEW_TAG="${LATEST_TAG_UAT}-pre-ga"
+              BLUE_GREEN_FLAG="true"
+              BLUE_GREEN_SVC_FLAG="true"
+            else
+              echo "⏹️ $svc unchanged, skipping..."
+              CUR_TAG="${LATEST_TAG_PRE_GA}-uat"
+              VAR_NAME=$(echo "${svc}_TAG" | tr '[:lower:]' '[:upper:]' | tr '-' '_')
+              echo "${VAR_NAME}=${CUR_TAG}" >> "$GITHUB_ENV"
+              echo "Set ${VAR_NAME}=${CUR_TAG}"
+              continue
+            fi
+
+            CUR_TAG="${LATEST_TAG_UAT}-uat"
+            infra/scripts/retag-ecr-image.sh \
+                "$REPO_NAME" \
+                "$CUR_TAG" \
+                "$NEW_TAG"
+
+            # Export PRE_GA tags to GitHub Actions environment
+            VAR_NAME=$(echo "${svc}_TAG" | tr '[:lower:]' '[:upper:]' | tr '-' '_')
+            echo "${VAR_NAME}=${NEW_TAG}" >> "$GITHUB_ENV"
+            echo "Set ${VAR_NAME}=${NEW_TAG}"
+      
+            # Export the next version to be deployed
+            VERSION_NAME=$(echo "${svc}_VERSION" | tr '[:lower:]' '[:upper:]' | tr '-' '_')
+            echo "${VERSION_NAME}=${LATEST_TAG_UAT}" >> "$GITHUB_ENV"
+            echo "Set ${VERSION_NAME}=${LATEST_TAG_UAT}"
+            
+            # Export blue-green flag of this svc
+            FLAG_NAME=$(echo "${svc}_FLAG" | tr '[:lower:]' '[:upper:]' | tr '-' '_')
+            echo "${FLAG_NAME}=${BLUE_GREEN_SVC_FLAG}" >> "$GITHUB_ENV"
+            echo "Set ${FLAG_NAME}=${BLUE_GREEN_SVC_FLAG}"
           
-          kubectl delete service frontend-service -n uat
-          kubectl delete service userservice-service -n uat
-          
-          kubectl delete deployment frontend-deployment -n uat
-          kubectl delete deployment userservice-deployment -n uat
-          kubectl delete deployment resumeppw-deployment -n uat
-          
-          kubectl delete serviceaccount jfc-sa -n uat
+          done    
+          # Export blue-green flag to env
+          echo "BLUE_GREEN_FLAG=${BLUE_GREEN_FLAG}" >> "$GITHUB_ENV"
+
+#      - name: Deploy All to GA if not exist
+#        working-directory: infra/k8s
+#        run: |
+#          if ["$FRONTEND_VERSION" == "v1.0.0"]; then
+#            export STAGE=uat
+#            export AWS_ACCOUNT_ID=${{ secrets.AWS_ACCOUNT_ID }}
+#
+#            envsubst < service-account.yaml | kubectl apply -f -
+#
+#            envsubst < frontend-deployment.yaml | kubectl apply -f -
+#            envsubst < userservice-deployment.yaml | kubectl apply -f -
+#            envsubst < resumeppw-deployment.yaml | kubectl apply -f -
+#            kubectl rollout status deployment/frontend-deployment -n uat --timeout=60s
+#            kubectl rollout status deployment/userservice-deployment -n uat --timeout=60s
+#            kubectl rollout status deployment/resumeppw-deployment -n uat --timeout=60s
+#
+#            envsubst < frontend-service.yaml | kubectl apply -f -
+#            envsubst < userservice-service.yaml | kubectl apply -f -
+#
+#            envsubst < ingress.yaml | kubectl apply -f -
+#
+#            echo "✅ Deployed all services v.1.0.0 to ga"
+#          fi
+#
+#      - name: Add Green Deployment and its Service to Cluster
+#        working-directory: infra/k8s
+#        run: |
+#
+
+#      - name: Add green Ingress Routing Resource to Cluster if there is any service update
+#        working-directory: infra/k8s
+#        run: |
+#          if ["$BLUE_GREEN_FLAG" == "true"]; then
+#            echo "Need to do blue-green"
+#          fi

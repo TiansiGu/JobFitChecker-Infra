@@ -1,11 +1,12 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: userservice-service
+  name: userservice-service-${APP_VERSION}
   namespace: ${STAGE}
 spec:
   selector:
     app: userservice # match Pod label
+    version: ${APP_VERSION}
   ports:
     - port: 8080  # the port number that the Service exposes inside the cluster
       targetPort: 8080  # the port on the container (inside the Pod) that the Service forwards traffic to.
