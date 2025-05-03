@@ -45,12 +45,14 @@ jobs:
         run: |
           for svc in frontend app postprocessor; do
             REPO_NAME="${{ secrets.ECR_REPO_NAMESPACE }}/$svc"
-            LATEST_TAG=$(infra/scripts/get-latest-qa-tag.sh \
+            LATEST_TAG=$(infra/scripts/get-latest-tag.sh \
               "$REPO_NAME" \
               "$AWS_REGION" \
-              "${{ secrets.AWS_ACCOUNT_ID }}")
+              "${{ secrets.AWS_ACCOUNT_ID }}" \
+              "qa")
+            LATEST_TAG_QA="${LATEST_TAG}-qa"
 
-            IMAGE_URI="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${AWS_REGION}.amazonaws.com/$REPO_NAME:$LATEST_TAG"
+            IMAGE_URI="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${AWS_REGION}.amazonaws.com/$REPO_NAME:$LATEST_TAG_QA"
 
             VAR_NAME=$(echo "${svc}_image" | tr '[:lower:]' '[:upper:]')
             echo "$VAR_NAME=$IMAGE_URI" >> $GITHUB_ENV
