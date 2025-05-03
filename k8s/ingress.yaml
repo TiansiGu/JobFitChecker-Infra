@@ -18,7 +18,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: userservice-service-${APP_VERSION}
+                name: app-service-${APP_VERSION}
                 port:
                   number: 8080
 

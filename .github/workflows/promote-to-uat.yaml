@@ -129,13 +129,13 @@ jobs:
           echo "Frontend: $FRONTEND_TAG"
           envsubst < frontend-deployment.yaml | kubectl apply -f -
           echo "App: $APP_TAG"
-          envsubst < userservice-deployment.yaml | kubectl apply -f -
+          envsubst < app-deployment.yaml | kubectl apply -f -
           echo "Postprocessor: $POSTPROCESSOR_TAG"
-          envsubst < resumeppw-deployment.yaml | kubectl apply -f -
+          envsubst < postprocessor-deployment.yaml | kubectl apply -f -
           
           kubectl rollout status deployment/frontend-deployment-${FRONTEND_VERSION} -n $STAGE --timeout=30s
-          kubectl rollout status deployment/userservice-deployment-${APP_VERSION} -n $STAGE --timeout=30s
-          kubectl rollout status deployment/resumeppw-deployment-${POSTPROCESSOR_VERSION} -n $STAGE --timeout=30s
+          kubectl rollout status deployment/app-deployment-${APP_VERSION} -n $STAGE --timeout=30s
+          kubectl rollout status deployment/postprocessor-deployment-${POSTPROCESSOR_VERSION} -n $STAGE --timeout=30s
           
           echo "✅ Pods after deployment: "
           kubectl get pods -n uat
@@ -146,7 +146,7 @@ jobs:
           export STAGE=uat
           echo "Deploying Services..."
           envsubst < frontend-service.yaml | kubectl apply -f -
-          envsubst < userservice-service.yaml | kubectl apply -f -
+          envsubst < app-service.yaml | kubectl apply -f -
           echo "✅ Services added: "
           kubectl get services -n uat
 
