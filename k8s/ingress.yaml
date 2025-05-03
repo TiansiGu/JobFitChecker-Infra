@@ -10,7 +10,7 @@ metadata:
 spec:
   ingressClassName: nginx          # Use nginx as IngressController
   rules:                           # Defines the routing rules for HTTP traffic
-    - host: ${STAGE}.tiansiwork.live        # !!To be changed to dynamic STAGE mapping
+    - host: ${SUB_DOMAIN}.tiansiwork.live
       http:
         paths:
           # APP: path start from "/api"

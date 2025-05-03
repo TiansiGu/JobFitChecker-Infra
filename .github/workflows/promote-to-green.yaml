@@ -8,7 +8,7 @@ permissions:
   contents: read    # Needed to clone repos and read GitHub contents
 
 jobs:
-  deploy-uat:
+  deploy-green:
     runs-on: ubuntu-latest
     env:
       AWS_REGION: us-west-2
@@ -38,18 +38,10 @@ jobs:
             --name ${{ secrets.CLUSTER_NAME}}
           kubectl config current-context
 
-#      - name: Clean up UAT deployments
-#        run: |
-#          kubectl delete ingress ingress -n uat
-#
-#          kubectl delete service frontend-service -n uat
-#          kubectl delete service app-service -n uat
-#
-#          kubectl delete deployment frontend-deployment -n uat
-#          kubectl delete deployment app-deployment -n uat
-#          kubectl delete deployment postprocessor-deployment -n uat
-#
-#          kubectl delete serviceaccount jfc-sa -n uat
+      - name: Clean up UAT deployments
+        run: |
+          kubectl delete all --all -n uat
+
 
       - name: Login to ECR
         run: |
@@ -59,7 +51,7 @@ jobs:
       - name: Make helper scripts executable
         run: chmod +x infra/scripts/*.sh
 
-      - name: Compare GA image tags, identify updated services, and re-tag to pre-ga
+      - name: Compare image tags, identify updated services, and re-tag to pre-ga
         run: |
           BLUE_GREEN_FLAG="false"
           for svc in frontend app postprocessor; do
@@ -72,7 +64,7 @@ jobs:
               "${{ secrets.AWS_ACCOUNT_ID }}" \
               uat)
 
-            # Get the latest uat tags
+            # Get the latest pre-ga tags
             LATEST_TAG_PRE_GA=$(infra/scripts/get-latest-tag.sh \
               "$REPO_NAME" \
               "$AWS_REGION" \
@@ -133,6 +125,7 @@ jobs:
           if [ "$FRONTEND_VERSION" == "v1-0-0" ]; then
             export STAGE=ga
             export AWS_ACCOUNT_ID=${{ secrets.AWS_ACCOUNT_ID }}
+            export SUB_DOMAIN=ga
             export INGRESS_RULE_NAME=ingress-blue
 
             envsubst < service-account.yaml | kubectl apply -f -
@@ -178,6 +171,12 @@ jobs:
       - name: Add Green Ingress Routing Resource to Cluster if there is any service update
         working-directory: infra/k8s
         run: |
-          if ["$BLUE_GREEN_FLAG" == "true"]; then
-            echo "Add green ingress..."
+          if [ "$BLUE_GREEN_FLAG" == "true" ]; then
+            echo "🆕 Adding green ingress..."
+            export STAGE=ga
+            export SUB_DOMAIN=green
+            export INGRESS_RULE_NAME=ingress-green
+            envsubst < ingress.yaml | kubectl apply -f -
+          else
+            echo "⏹️ No need to add green ingress, skipping..."
           fi

@@ -1,0 +1,113 @@
+name: Deploy to Blue to GA
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write   # Needed for OIDC
+  contents: read    # Needed to clone repos and read GitHub contents
+
+jobs:
+  deploy-ga:
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: us-west-2
+
+    steps:
+      - name: Checkout Infra Repo
+        uses: actions/checkout@v4
+        with:
+          repository: "TiansiGu/JobFitChecker-Infra"
+          path: "infra"
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'latest'
+
+      - name: Update kubectl config for EKS
+        run: |
+          aws eks update-kubeconfig \
+            --region ${{ env.AWS_REGION }} \
+            --name ${{ secrets.CLUSTER_NAME}}
+          kubectl config current-context
+
+      - name: Login to ECR
+        run: |
+          aws ecr get-login-password --region $AWS_REGION \
+          | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.$AWS_REGION.amazonaws.com
+
+      - name: Make helper scripts executable
+        run: chmod +x infra/scripts/*.sh
+
+      - name: Compare ga image tags, identify updated services, and re-tag to ga
+        run: |
+          BLUE_GREEN_FLAG="false"
+          for svc in frontend app postprocessor; do
+            REPO_NAME="${{ secrets.ECR_REPO_NAMESPACE }}/$svc"
+            
+            # Get the latest pre-ga tags
+            LATEST_TAG_PRE_GA=$(infra/scripts/get-latest-tag.sh \
+            "$REPO_NAME" \
+            "$AWS_REGION" \
+            "${{ secrets.AWS_ACCOUNT_ID }}" \
+            pre-ga)
+            
+            # Get the latest ga tags
+            LATEST_TAG_GA=$(infra/scripts/get-latest-tag.sh \
+            "$REPO_NAME" \
+            "$AWS_REGION" \
+            "${{ secrets.AWS_ACCOUNT_ID }}" \
+            ga)
+            
+            # Export the next desired version (it will be applied by ingress)
+            VERSION_NAME=$(echo "${svc}_VERSION" | tr '[:lower:]' '[:upper:]' | tr '-' '_')
+            DNS_VERSION=$(echo "$LATEST_TAG_PRE_GA" | tr '.' '-')
+            echo "${VERSION_NAME}=${DNS_VERSION}" >> "$GITHUB_ENV"
+            echo "Set ${VERSION_NAME}=${DNS_VERSION}"
+            
+            if [ "$LATEST_TAG_GA" = "none" ]; then
+              echo " 🆕 GA tag does not exist, will add."
+              NEW_TAG="${LATEST_TAG_PRE_GA}-ga"
+            elif [ "$LATEST_TAG_GA" != "$LATEST_TAG_PRE_GA" ] && [ "$(printf "%s\n%s" "$LATEST_TAG_GA" "$LATEST_TAG_PRE_GA" | sort -V | head -n1)" = "$LATEST_TAG_GA" ]; then
+              echo " 🆕 $LATEST_TAG_GA is less than $LATEST_TAG_PRE_GA, $svc was updated"
+              NEW_TAG="${LATEST_TAG_PRE_GA}-ga"
+              BLUE_GREEN_FLAG="true"
+            else
+              echo "⏹️ $svc unchanged, skipping..."
+              continue
+            fi
+            
+            CUR_TAG="${LATEST_TAG_PRE_GA}-pre-ga"
+            infra/scripts/retag-ecr-image.sh \
+            "$REPO_NAME" \
+            "$CUR_TAG" \
+            "$NEW_TAG"
+            
+            # Export PRE_GA tags to GitHub Actions environment
+            VAR_NAME=$(echo "${svc}_TAG" | tr '[:lower:]' '[:upper:]' | tr '-' '_')
+            echo "${VAR_NAME}=${NEW_TAG}" >> "$GITHUB_ENV"
+            echo "Set ${VAR_NAME}=${NEW_TAG}"
+          done
+          
+          # Export blue-green flag to env
+          echo "BLUE_GREEN_FLAG=${BLUE_GREEN_FLAG}" >> "$GITHUB_ENV"
+
+#      - name: Apply Green Ingress Routing Rule to Blue if there is any service update
+#        working-directory: infra/k8s
+#        run: |
+#          if [ "$BLUE_GREEN_FLAG" == "true" ]; then
+#            echo "🆕 Applying new version to blue..."
+#            export STAGE=ga
+#            export SUB_DOMAIN=ga
+#            export INGRESS_RULE_NAME=ingress-blue
+#            envsubst < ingress.yaml | kubectl apply -f -
+#          else
+#            echo "⏹️ No need to update blue ingress, skipping..."
+#          fi

@@ -154,6 +154,7 @@ jobs:
         working-directory: infra/k8s
         run: |
           export STAGE=uat
+          export SUB_DOMAIN=uat
           export INGRESS_RULE_NAME=ingress-uat
           echo "Deploying Ingress..."
           envsubst < ingress.yaml | kubectl apply -f -
