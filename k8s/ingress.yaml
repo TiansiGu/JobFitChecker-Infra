@@ -1,7 +1,7 @@
 apiVersion: networking.k8s.io/v1   # Specifies the API version for the Ingress resource
 kind: Ingress
 metadata:
-  name: ingress
+  name: ${INGRESS_RULE_NAME}       # substitutable name, support blue-green
   namespace: ${STAGE}
   annotations:
     nginx.ingress.kubernetes.io/use-regex: "true"  # Use regex matching in paths

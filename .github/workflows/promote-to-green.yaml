@@ -1,0 +1,52 @@
+name: Deploy to GA (production) with blue-green
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write   # Needed for OIDC
+  contents: read    # Needed to clone repos and read GitHub contents
+
+jobs:
+  deploy-uat:
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: us-west-2
+
+    steps:
+      - name: Checkout Infra Repo
+        uses: actions/checkout@v4
+        with:
+          repository: "TiansiGu/JobFitChecker-Infra"
+          path: "infra"
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'latest'
+
+      - name: Update kubectl config for EKS
+        run: |
+          aws eks update-kubeconfig \
+            --region ${{ env.AWS_REGION }} \
+            --name ${{ secrets.CLUSTER_NAME}}
+          kubectl config current-context
+
+      - name: Clean up UAT deployments
+        run: |
+          kubectl delete ingress ingress -n uat 
+          
+          kubectl delete service frontend-service -n uat
+          kubectl delete service userservice-service -n uat
+          
+          kubectl delete deployment frontend-deployment -n uat
+          kubectl delete deployment userservice-deployment -n uat
+          kubectl delete deployment resumeppw-deployment -n uat
+          
+          kubectl delete serviceaccount jfc-sa -n uat
