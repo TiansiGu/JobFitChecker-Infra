@@ -17,3 +17,10 @@ resource "kubernetes_namespace" "ga" {
   }
   depends_on = [module.eks]
 }
+
+resource "kubernetes_namespace" "ingress-nginx" {
+  metadata {
+    name = "ingress-nginx"
+  }
+  depends_on = [module.eks]
+}

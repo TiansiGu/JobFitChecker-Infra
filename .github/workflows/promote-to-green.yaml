@@ -78,6 +78,12 @@ jobs:
               "$AWS_REGION" \
               "${{ secrets.AWS_ACCOUNT_ID }}" \
               pre-ga)
+            
+            # Export the next desired version (not mean it will necesarily be deployed again)
+            VERSION_NAME=$(echo "${svc}_VERSION" | tr '[:lower:]' '[:upper:]' | tr '-' '_')
+            DNS_VERSION=$(echo "$LATEST_TAG_UAT" | tr '.' '-')
+            echo "${VERSION_NAME}=${DNS_VERSION}" >> "$GITHUB_ENV"
+            echo "Set ${VERSION_NAME}=${DNS_VERSION}"
 
             BLUE_GREEN_SVC_FLAG="false"
             if [ "$LATEST_TAG_PRE_GA" = "none" ]; then
@@ -107,11 +113,6 @@ jobs:
             VAR_NAME=$(echo "${svc}_TAG" | tr '[:lower:]' '[:upper:]' | tr '-' '_')
             echo "${VAR_NAME}=${NEW_TAG}" >> "$GITHUB_ENV"
             echo "Set ${VAR_NAME}=${NEW_TAG}"
-      
-            # Export the next version to be deployed
-            VERSION_NAME=$(echo "${svc}_VERSION" | tr '[:lower:]' '[:upper:]' | tr '-' '_')
-            echo "${VERSION_NAME}=${LATEST_TAG_UAT}" >> "$GITHUB_ENV"
-            echo "Set ${VERSION_NAME}=${LATEST_TAG_UAT}"
             
             # Export blue-green flag of this svc
             FLAG_NAME=$(echo "${svc}_FLAG" | tr '[:lower:]' '[:upper:]' | tr '-' '_')
@@ -122,34 +123,37 @@ jobs:
           # Export blue-green flag to env
           echo "BLUE_GREEN_FLAG=${BLUE_GREEN_FLAG}" >> "$GITHUB_ENV"
 
-#      - name: Deploy All to GA if not exist
-#        working-directory: infra/k8s
-#        run: |
-#          if ["$FRONTEND_VERSION" == "v1.0.0"]; then
-#            export STAGE=uat
-#            export AWS_ACCOUNT_ID=${{ secrets.AWS_ACCOUNT_ID }}
-#
-#            envsubst < service-account.yaml | kubectl apply -f -
-#
-#            envsubst < frontend-deployment.yaml | kubectl apply -f -
-#            envsubst < userservice-deployment.yaml | kubectl apply -f -
-#            envsubst < resumeppw-deployment.yaml | kubectl apply -f -
-#            kubectl rollout status deployment/frontend-deployment -n uat --timeout=60s
-#            kubectl rollout status deployment/userservice-deployment -n uat --timeout=60s
-#            kubectl rollout status deployment/resumeppw-deployment -n uat --timeout=60s
-#
-#            envsubst < frontend-service.yaml | kubectl apply -f -
-#            envsubst < userservice-service.yaml | kubectl apply -f -
-#
-#            envsubst < ingress.yaml | kubectl apply -f -
-#
-#            echo "✅ Deployed all services v.1.0.0 to ga"
-#          fi
-#
-#      - name: Add Green Deployment and its Service to Cluster
-#        working-directory: infra/k8s
-#        run: |
-#
+      - name: Deploy All to GA if not exist
+        working-directory: infra/k8s
+        run: |
+          if [ "$FRONTEND_VERSION" == "v1-0-0" ]; then
+            export STAGE=ga
+            export AWS_ACCOUNT_ID=${{ secrets.AWS_ACCOUNT_ID }}
+            export INGRESS_RULE_NAME=ingress-blue
+
+            envsubst < service-account.yaml | kubectl apply -f -
+
+            envsubst < frontend-deployment.yaml | kubectl apply -f -
+            envsubst < userservice-deployment.yaml | kubectl apply -f -
+            envsubst < resumeppw-deployment.yaml | kubectl apply -f -
+            kubectl rollout status deployment/frontend-deployment-${FRONTEND_VERSION} -n $STAGE --timeout=60s
+            kubectl rollout status deployment/userservice-deployment-${APP_VERSION} -n $STAGE --timeout=60s
+            kubectl rollout status deployment/resumeppw-deployment-${POSTPROCESSOR_VERSION} -n $STAGE --timeout=60s
+
+            envsubst < frontend-service.yaml | kubectl apply -f -
+            envsubst < userservice-service.yaml | kubectl apply -f -
+
+            envsubst < ingress.yaml | kubectl apply -f -
+
+            echo "✅ Deployed all services v.1.0.0 to ga"
+          fi
+
+      - name: Add Green Deployment and its Service to Cluster
+        working-directory: infra/k8s
+        run: |
+          if [ "$FRONTEND_FLAG" == "true" ]; then
+            echo "Deploying frontend green deployment and service..."
+          fi
 
 #      - name: Add green Ingress Routing Resource to Cluster if there is any service update
 #        working-directory: infra/k8s

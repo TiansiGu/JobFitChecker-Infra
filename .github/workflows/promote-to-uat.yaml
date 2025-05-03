@@ -63,6 +63,12 @@ jobs:
               "$AWS_REGION" \
               "${{ secrets.AWS_ACCOUNT_ID }}" \
               uat)
+          
+            # Export the next version to be deployed (always align with latest qa tag)
+            VERSION_NAME=$(echo "${svc}_VERSION" | tr '[:lower:]' '[:upper:]' | tr '-' '_')
+            DNS_VERSION=$(echo "$LATEST_TAG_QA" | tr '.' '-')
+            echo "${VERSION_NAME}=${DNS_VERSION}" >> "$GITHUB_ENV"
+            echo "Set ${VERSION_NAME}=${DNS_VERSION}"
             
             if [ "$LATEST_TAG_UAT" = "none" ]; then
               echo " 🆕 UAT tag does not exist, will add."
@@ -127,9 +133,9 @@ jobs:
           echo "Postprocessor: $POSTPROCESSOR_TAG"
           envsubst < resumeppw-deployment.yaml | kubectl apply -f -
           
-          kubectl rollout status deployment/frontend-deployment -n uat --timeout=30s
-          kubectl rollout status deployment/userservice-deployment -n uat --timeout=30s
-          kubectl rollout status deployment/resumeppw-deployment -n uat --timeout=30s
+          kubectl rollout status deployment/frontend-deployment-${FRONTEND_VERSION} -n $STAGE --timeout=30s
+          kubectl rollout status deployment/userservice-deployment-${APP_VERSION} -n $STAGE --timeout=30s
+          kubectl rollout status deployment/resumeppw-deployment-${POSTPROCESSOR_VERSION} -n $STAGE --timeout=30s
           
           echo "✅ Pods after deployment: "
           kubectl get pods -n uat
@@ -148,6 +154,7 @@ jobs:
         working-directory: infra/k8s
         run: |
           export STAGE=uat
+          export INGRESS_RULE_NAME=ingress-uat
           echo "Deploying Ingress..."
           envsubst < ingress.yaml | kubectl apply -f -
           echo "✅ Ingress routing rules added: "
