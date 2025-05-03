@@ -36,3 +36,63 @@ jobs:
           cd infra/terraform/qa
           terraform init
           terraform destroy -auto-approve
+
+      - name: Login to ECR
+        run: |
+          aws ecr get-login-password --region $AWS_REGION \
+          | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.$AWS_REGION.amazonaws.com
+
+      - name: Make helper scripts executable
+        run: chmod +x infra/scripts/*.sh
+
+      - name: Compare UAT image tags and Re-tag updated images
+        run: |
+          for svc in frontend app postprocessor; do
+            REPO_NAME="${{ secrets.ECR_REPO_NAMESPACE }}/$svc"
+            
+            # Get the latest qa tags
+            LATEST_TAG_QA=$(infra/scripts/get-latest-tag.sh \
+              "$REPO_NAME" \
+              "$AWS_REGION" \
+              "${{ secrets.AWS_ACCOUNT_ID }}" \
+              qa)
+          
+            # Get the latest uat tags
+            LATEST_TAG_UAT=$(infra/scripts/get-latest-tag.sh \
+              "$REPO_NAME" \
+              "$AWS_REGION" \
+              "${{ secrets.AWS_ACCOUNT_ID }}" \
+              uat)
+            
+            if [ "$LATEST_TAG_UAT" = "none" ]; then
+              echo " 🆕 UAT tag does not exist, will add."
+              NEW_TAG="${LATEST_TAG_QA}-uat"
+            elif [ "$LATEST_TAG_UAT" != "$LATEST_TAG_QA" ] && [ "$(printf "%s\n%s" "$LATEST_TAG_UAT" "$LATEST_TAG_QA" | sort -V | head -n1)" = "$LATEST_TAG_UAT" ]; then
+              echo " 🆕 $LATEST_TAG_UAT is less than $LATEST_TAG_QA, $svc was updated"
+              NEW_TAG="${LATEST_TAG_QA}-uat"
+            else
+              echo "⏹️ $svc unchanged, skipping..."
+              continue
+            fi
+            
+            CUR_TAG="${LATEST_TAG_QA}-qa"
+            infra/scripts/retag-ecr-image.sh \
+                "$REPO_NAME" \
+                "$CUR_TAG" \
+                "$NEW_TAG"
+          done
+
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'latest'
+
+#      - name: Update kubectl config for EKS
+#        run: |
+#          aws eks update-kubeconfig \
+#            --region us-east-1 \
+#            --name ${{ env.EKS_CLUSTER }}
+
+#      - name: Deploy to Cluster
+#        run: |
