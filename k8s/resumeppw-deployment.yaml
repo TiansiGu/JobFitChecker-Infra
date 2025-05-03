@@ -17,7 +17,7 @@ spec:
       containers: # usually 1 container per pod
         - name: jfc-resumeppw-container
           imagePullPolicy: Always
-          image: 891612549148.dkr.ecr.us-west-2.amazonaws.com/job-fit-checker/postprocessor:${PPW_TAG}
+          image: 891612549148.dkr.ecr.us-west-2.amazonaws.com/job-fit-checker/postprocessor:${POSTPROCESSOR_TAG}
           env:
             - name: MY_DB_HOST
               value: "resumeinfo-database.ch00ay8y21vy.us-west-2.rds.amazonaws.com"
