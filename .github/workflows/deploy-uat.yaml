@@ -1,0 +1,38 @@
+name: Deploy to UAT
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write   # Needed for OIDC
+  contents: read    # Needed to clone repos and read GitHub contents
+
+jobs:
+  deploy-uat:
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: us-west-2
+
+    steps:
+      - name: Checkout Infra Repo
+        uses: actions/checkout@v4
+        with:
+          repository: "TiansiGu/JobFitChecker-Infra"
+          path: "infra"
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.11.3
+
+      - name: Destroy QA EC2
+        run: |
+          cd infra/terraform/qa
+          terraform init
+          terraform destroy -auto-approve
