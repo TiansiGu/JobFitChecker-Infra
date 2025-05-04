@@ -1,4 +1,4 @@
-name: Deploy to Green to GA
+name: Deploy Green to GA
 
 on:
   workflow_dispatch:

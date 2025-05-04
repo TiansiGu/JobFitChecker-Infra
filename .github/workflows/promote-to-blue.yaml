@@ -1,4 +1,4 @@
-name: Deploy to Blue to GA
+name: Deploy Blue to GA
 
 on:
   workflow_dispatch:
@@ -98,16 +98,27 @@ jobs:
           
           # Export blue-green flag to env
           echo "BLUE_GREEN_FLAG=${BLUE_GREEN_FLAG}" >> "$GITHUB_ENV"
+          echo "BLUE_GREEN_FLAG: ${BLUE_GREEN_FLAG}"
 
-#      - name: Apply Green Ingress Routing Rule to Blue if there is any service update
-#        working-directory: infra/k8s
-#        run: |
-#          if [ "$BLUE_GREEN_FLAG" == "true" ]; then
-#            echo "🆕 Applying new version to blue..."
-#            export STAGE=ga
-#            export SUB_DOMAIN=ga
-#            export INGRESS_RULE_NAME=ingress-blue
-#            envsubst < ingress.yaml | kubectl apply -f -
-#          else
-#            echo "⏹️ No need to update blue ingress, skipping..."
-#          fi
+      - name: Apply Ingress Green Routing Rule to Blue if there is any service update
+        working-directory: infra/k8s
+        run: |
+          if [ "$BLUE_GREEN_FLAG" == "true" ]; then
+            echo "🔄 Applying new version to blue..."
+            export STAGE=ga
+            export SUB_DOMAIN=ga
+            export INGRESS_RULE_NAME=ingress-blue
+            envsubst < ingress.yaml | kubectl apply -f -
+          else
+            echo "⏹️ No need to update blue ingress, skipping..."
+          fi
+
+      - name: Delete Ingress Green
+        working-directory: infra/k8s
+        run: |
+          if [ "$BLUE_GREEN_FLAG" == "true" ]; then
+            echo "🔄 Deleting ingress green..."
+            kubectl delete ingress ingress-green -n ga
+          else
+            echo "⏹️ No need to delete green ingress, skipping..."
+          fi
