@@ -38,9 +38,17 @@ jobs:
             --name ${{ secrets.CLUSTER_NAME}}
           kubectl config current-context
 
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.11.3
+
       - name: Clean up UAT deployments
         run: |
           kubectl delete all --all -n uat
+          cd infra/terraform/uat
+          terraform init
+          terraform destroy -auto-approve
 
 
       - name: Login to ECR
@@ -127,6 +135,9 @@ jobs:
             export AWS_ACCOUNT_ID=${{ secrets.AWS_ACCOUNT_ID }}
             export SUB_DOMAIN=ga
             export INGRESS_RULE_NAME=ingress-blue
+          
+            export S3_BUCKET_NAME=bucket1725213899633
+            export SQS_QUEUE_URL=https://sqs.us-east-2.amazonaws.com/891612549148/putResumeSQS
 
             envsubst < service-account.yaml | kubectl apply -f -
 
@@ -151,6 +162,8 @@ jobs:
       - name: Add Green Deployment and its Service to Cluster
         working-directory: infra/k8s
         run: |
+          export S3_BUCKET_NAME=bucket1725213899633
+          export SQS_QUEUE_URL=https://sqs.us-east-2.amazonaws.com/891612549148/putResumeSQS
           for svc in frontend app postprocessor; do
             FLAG_VAR=$(echo "${svc}_FLAG" | tr '[:lower:]' '[:upper:]' | tr '-' '_')
             FLAG=$(printenv "$FLAG_VAR")

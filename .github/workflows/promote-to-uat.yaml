@@ -37,6 +37,17 @@ jobs:
           terraform init
           terraform destroy -auto-approve
 
+      - name: Launch resources for UAT (S3, SQS)
+        run: |
+          cd infra/terraform/uat
+          terraform init
+          terraform apply -auto-approve
+          
+          S3_BUCKET_NAME=$(terraform output -raw s3_bucket_name)
+          SQS_QUEUE_URL=$(terraform output -raw sqs_queue_url)
+          echo "S3_BUCKET_NAME=$S3_BUCKET_NAME" >> $GITHUB_ENV
+          echo "SQS_QUEUE_URL=$SQS_QUEUE_URL" >> $GITHUB_ENV
+
       - name: Login to ECR
         run: |
           aws ecr get-login-password --region $AWS_REGION \
@@ -96,7 +107,6 @@ jobs:
             echo "${VAR_NAME}=${NEW_TAG}" >> "$GITHUB_ENV"
             echo "Set ${VAR_NAME}=${NEW_TAG}"
           done
-
 
       - name: Set up kubectl
         uses: azure/setup-kubectl@v4
