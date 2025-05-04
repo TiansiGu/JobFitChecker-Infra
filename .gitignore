@@ -1,6 +1,7 @@
 .idea
 terraform/eks/.*
 terraform/qa/.*
+terraform/uat/.*
 *.tfstate
 *.tfstate.backup
 *.pem

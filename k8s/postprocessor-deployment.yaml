@@ -29,6 +29,10 @@ spec:
               value: "ResumeReader24!"
             - name: OPEN_AI_API_KEY
               value: "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"
+            - name: S3_BUCKET_NAME
+              value: ${S3_BUCKET_NAME}
+            - name: SQS_QUEUE_URL
+              value: ${SQS_QUEUE_URL}
 
 
 
