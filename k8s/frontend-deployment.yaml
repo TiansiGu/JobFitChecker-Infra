@@ -4,7 +4,7 @@ metadata:
   name: frontend-deployment-${FRONTEND_VERSION}
   namespace: ${STAGE} # in which namespace does the resource lives
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       app: frontend

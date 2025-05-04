@@ -143,6 +143,9 @@ jobs:
             envsubst < ingress.yaml | kubectl apply -f -
 
             echo "✅ Deployed all services v.1.0.0 to ga"
+          
+          else
+            echo "⏹️ No need to deploy all v.1.0.0 to ga"
           fi
 
       - name: Add Green Deployment and its Service to Cluster
