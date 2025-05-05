@@ -119,12 +119,12 @@ jobs:
           scp -i private-subnet.pem \
             -o StrictHostKeyChecking=no \
             source/docker-compose-qa.yml \
-            ec2-user@${{ env.PUBLIC_IP }}:/home/ec2-user/docker-compose.yml
+            ec2-user@${{ env.PUBLIC_IP }}:~/docker-compose.yml
 
           scp -i private-subnet.pem \
             -o StrictHostKeyChecking=no \
             merged.env \
-            ec2-user@${{ env.PUBLIC_IP }}:/home/ec2-user/.env
+            ec2-user@${{ env.PUBLIC_IP }}:~/.env
 
           ssh -i private-subnet.pem \
             -o StrictHostKeyChecking=no \
@@ -136,11 +136,18 @@ jobs:
               export AWS_SECRET_ACCESS_KEY=$SECRET_KEY
               export AWS_SESSION_TOKEN=$SESSION_TOKEN
           
+              mkdir -p ~/app
+              cp ~/docker-compose-qa.yml ~/app/docker-compose.yml
+              cp ~/.env ~/app/.env
+              cd ~/app
+          
               aws ecr get-login-password --region \$AWS_REGION | docker login \
                 --username AWS --password-stdin \$AWS_ACCOUNT_ID.dkr.ecr.\$AWS_REGION.amazonaws.com
-
-              cd /home/ec2-user
+          
               docker-compose up -d
+              sleep 10
+              docker ps
+              pwd
           EOF
           
           

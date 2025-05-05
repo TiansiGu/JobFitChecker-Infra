@@ -10,8 +10,9 @@ data "aws_ami" "ec2_image" {
 resource "aws_instance" "ec2" {
   count         = 1
   ami           = data.aws_ami.ec2_image.id
-  instance_type = "t2.micro"
+  instance_type = "t3.medium"
   subnet_id = var.public_subnet_ids[0]
+  key_name      = var.ec2_key_name
   vpc_security_group_ids = [aws_security_group.qa_ec2.id]
   tags = {
     Name = "qa"

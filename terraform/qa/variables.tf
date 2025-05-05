@@ -21,3 +21,9 @@ variable "rds_sg_id" {
   type    = string
   default = "sg-037631e67ccb1dd64"
 }
+
+variable "ec2_key_name" {
+  description = "The name of the EC2 key pair to use"
+  type        = string
+  default     = "private-subnet"
+}
